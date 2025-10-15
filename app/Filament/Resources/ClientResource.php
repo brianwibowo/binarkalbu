@@ -16,57 +16,69 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
 use pxlrbt\FilamentExcel\Exports\ExcelExport;
+use Filament\Forms\Components\Group; // <-- PASTIKAN USE STATEMENT INI ADA
 
 class ClientResource extends Resource
 {
     protected static ?string $model = Client::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-user-group';
 
     public static function form(Form $form): Form
     {
+        // Cek apakah user yang sedang login adalah Admin.
+        $isAdmin = Auth::user()->role === 'admin';
+
         return $form
             ->schema([
-                TextInput::make('name')
-                    ->required()
-                    ->maxLength(255),
-                DatePicker::make('date_of_birth'),
-                TextInput::make('whatsapp_number')
-                    ->tel()
-                    ->maxLength(20),
-                Textarea::make('address')
-                    ->columnSpanFull(),
-                Textarea::make('initial_diagnosis')
-                    ->columnSpanFull(),
+                // BUNGKUS SEMUA FIELD DALAM SEBUAH GROUP
+                // GROUP INI AKAN DISEMBUNYIKAN JIKA USER BUKAN ADMIN
+                Group::make()
+                    ->schema([
+                        TextInput::make('name')
+                            ->required()
+                            ->maxLength(255),
+                        DatePicker::make('date_of_birth'),
+                        TextInput::make('whatsapp_number')
+                            ->tel()
+                            ->maxLength(20),
+                        Textarea::make('address')
+                            ->columnSpanFull(),
+                        Textarea::make('initial_diagnosis')
+                            ->columnSpanFull(),
+                    ])
+                    ->hidden(! $isAdmin) // <-- LOGIKA KUNCI: SEMBUNYIKAN DARI PSIKOLOG
             ]);
     }
 
     public static function table(Table $table): Table
     {
+        // Cek apakah user adalah psikolog
+        $isPsikolog = Auth::user()->role === 'psikolog';
+
         return $table
             ->columns([
                 TextColumn::make('name')
-                    ->searchable(), // Menambahkan ikon pencarian
-                TextColumn::make('whatsapp_number')
                     ->searchable(),
                 TextColumn::make('date_of_birth')
                     ->date()
-                    ->sortable(), // Menambahkan fitur sort
+                    ->sortable(),
+                TextColumn::make('whatsapp_number')
+                    ->searchable()
+                    ->hidden($isPsikolog), // Kolom ini tetap disembunyikan dari tabel
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true), // Kolom ini bisa disembunyikan
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                // Filter akan kita tambahkan nanti
+                // ...
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
+                Tables\Actions\CreateAction::make()->hidden($isPsikolog), // Tombol Buat Klien Baru disembunyikan
                 ExportAction::make('exportExcel')
-                    ->label('Export Excel')
                     ->exports([
                         ExcelExport::make('all_data')
                             ->fromTable()
@@ -74,14 +86,16 @@ class ClientResource extends Resource
                     ]),
             ])
             ->actions([
+                // Tombol Edit di baris ini SEKARANG TERLIHAT oleh semua role
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()->hidden($isPsikolog),
                 ]),
             ]);
     }
+
     public static function getRelations(): array
     {
         return [
@@ -100,17 +114,14 @@ class ClientResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-    // Ambil query dasar
-    $query = parent::getEloquentQuery();
+        $query = parent::getEloquentQuery();
 
-    // Jika user yang login adalah admin, tampilkan semua data
-    if (Auth::user()->role === 'admin') {
-        return $query;
-    }
+        if (Auth::user()->role === 'admin') {
+            return $query;
+        }
 
-    // Jika psikolog, filter klien yang punya sesi dengan ID psikolog ini
-    return $query->whereHas('sessions', function (Builder $query) {
-        $query->where('user_id', Auth::id());
-    });
+        return $query->whereHas('sessions', function (Builder $query) {
+            $query->where('user_id', Auth::id());
+        });
     }
 }

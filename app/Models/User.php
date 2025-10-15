@@ -3,15 +3,16 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Filament\Models\Contracts\HasAvatar; // <-- 1. TAMBAHKAN INI
+use Filament\Models\Contracts\HasAvatar; 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Storage; // <-- 2. TAMBAHKAN INI
+use Illuminate\Support\Facades\Storage; 
+use Illuminate\Database\Eloquent\SoftDeletes;
 
-class User extends Authenticatable implements HasAvatar // <-- 3. TAMBAHKAN "implements HasAvatar"
+class User extends Authenticatable implements HasAvatar
 {
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.

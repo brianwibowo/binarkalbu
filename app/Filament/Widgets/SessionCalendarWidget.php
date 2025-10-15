@@ -14,9 +14,12 @@ use Saade\FilamentFullCalendar\Widgets\FullCalendarWidget;
 class SessionCalendarWidget extends FullCalendarWidget
 {
     protected int | string | array $columnSpan = 'full';
+    
+    // Properti ini sudah memiliki tipe data yang benar untuk menghindari error.
+    public Model|int|string|null $record = null;
 
     /**
-     * Menonaktifkan tombol “New Session” di header kalender
+     * Menonaktifkan tombol "New event" di header kalender
      */
     protected function headerActions(): array
     {
@@ -24,17 +27,33 @@ class SessionCalendarWidget extends FullCalendarWidget
     }
 
     /**
-     * Menonaktifkan tombol Edit/Delete pada popup event
+     * KUNCI #1: Ini adalah event listener yang dijalankan saat jadwal diklik.
+     * Tugasnya adalah mengambil data dari DB dan menyiapkan Aksi 'view'.
+     */
+    public function onEventClick(array $event): void
+    {
+        // 1. Ambil record dari database menggunakan ID dari event yang diklik
+        $this->record = ClientSession::find($event['id']);
+
+        // 2. Panggil (mount) Aksi 'view'. Ini akan memicu pop-up.
+        $this->mountAction('view');
+    }
+
+    /**
+     * KUNCI #2: Kita KEMBALI menggunakan getModalActions()
+     * Ini adalah fungsi yang dipanggil oleh kalender untuk membuat tombol di dalam pop-up.
      */
     protected function getModalActions(): array
     {
         return [
+            // Hanya tampilkan tombol "View"
             $this->getViewAction(),
         ];
     }
-
+    
     /**
-     * Aksi “View” untuk menampilkan detail sesi (tanpa edit/delete)
+     * KUNCI #3: Kita KEMBALI menggunakan getViewAction() dengan ViewAction dari package.
+     * Kode ini sekarang akan bekerja karena onEventClick sudah menyiapkan datanya.
      */
     protected function getViewAction(): Action
     {
@@ -56,13 +75,11 @@ class SessionCalendarWidget extends FullCalendarWidget
     }
 
     /**
-     * Ambil data event dari database untuk kalender
+     * Ambil data event dari database untuk kalender (Kode ini sudah benar)
      */
     public function fetchEvents(array $fetchInfo): array
     {
-        /** @var User $user */
         $user = Auth::user();
-
         $query = ClientSession::query()
             ->with(['client', 'user'])
             ->whereBetween('session_date', [$fetchInfo['start'], $fetchInfo['end']]);
@@ -74,19 +91,17 @@ class SessionCalendarWidget extends FullCalendarWidget
         return $query->get()->map(function (ClientSession $session) {
             return [
                 'id' => $session->id,
-                'title' => "{$session->client?->name} ({$session->user?->name})",
+                'title' => $session->client?->name ?? 'Klien (Dihapus)',
                 'start' => "{$session->session_date} {$session->session_start_time}",
                 'end' => "{$session->session_date} {$session->session_end_time}",
             ];
         })->all();
     }
-
-    /**
-     * Pastikan tidak ada tombol Create sama sekali
-     */
+    
     public static function canCreate(): bool
     {
         return false;
     }
+
     protected static ?int $sort = 3;
 }

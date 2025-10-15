@@ -81,6 +81,7 @@ class Profile extends Page implements HasForms
                             ->avatar()
                             ->imageEditor()
                             ->circleCropper()
+                            ->disk('public')
                             ->directory('avatars'),
                         TextInput::make('name')
                             ->label('Nama')
