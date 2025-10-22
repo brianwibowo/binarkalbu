@@ -1,22 +1,31 @@
 <?php
-
 namespace App\Filament\Widgets;
 
 use App\Models\ClientSession;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Infolist;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
-use Saade\FilamentFullCalendar\Actions\ViewAction;
 use Saade\FilamentFullCalendar\Widgets\FullCalendarWidget;
 
 class SessionCalendarWidget extends FullCalendarWidget
 {
     protected int | string | array $columnSpan = 'full';
     
-    // Properti ini sudah memiliki tipe data yang benar untuk menghindari error.
     public Model|int|string|null $record = null;
+
+    /**
+     * Konfigurasi FullCalendar
+     */
+    public function config(): array
+    {
+        return [
+            'displayEventTime' => false, // Sembunyikan waktu otomatis
+            'locale' => 'id', // Set locale Indonesia
+        ];
+    }
 
     /**
      * Menonaktifkan tombol "New event" di header kalender
@@ -27,55 +36,70 @@ class SessionCalendarWidget extends FullCalendarWidget
     }
 
     /**
-     * KUNCI #1: Ini adalah event listener yang dijalankan saat jadwal diklik.
-     * Tugasnya adalah mengambil data dari DB dan menyiapkan Aksi 'view'.
+     * Event listener saat jadwal diklik
      */
     public function onEventClick(array $event): void
     {
-        // 1. Ambil record dari database menggunakan ID dari event yang diklik
-        $this->record = ClientSession::find($event['id']);
-
-        // 2. Panggil (mount) Aksi 'view'. Ini akan memicu pop-up.
+        $this->record = ClientSession::with(['client', 'user'])->find($event['id']);
         $this->mountAction('view');
     }
 
     /**
-     * KUNCI #2: Kita KEMBALI menggunakan getModalActions()
-     * Ini adalah fungsi yang dipanggil oleh kalender untuk membuat tombol di dalam pop-up.
+     * Definisikan actions yang tersedia
      */
-    protected function getModalActions(): array
+    protected function modalActions(): array
     {
         return [
-            // Hanya tampilkan tombol "View"
-            $this->getViewAction(),
+            $this->viewAction(),
         ];
-    }
-    
-    /**
-     * KUNCI #3: Kita KEMBALI menggunakan getViewAction() dengan ViewAction dari package.
-     * Kode ini sekarang akan bekerja karena onEventClick sudah menyiapkan datanya.
-     */
-    protected function getViewAction(): Action
-    {
-        return ViewAction::make()
-            ->infolist([
-                TextEntry::make('client.name')->label('Nama Klien'),
-                TextEntry::make('user.name')->label('Psikolog'),
-                TextEntry::make('session_date')->label('Tanggal Sesi')
-                    ->date('d F Y'),
-                TextEntry::make('session_start_time')->label('Waktu')
-                    ->formatStateUsing(function ($record) {
-                        if (!$record) return '';
-                        return \Carbon\Carbon::parse($record->session_start_time)->format('H:i')
-                            . ' - ' .
-                            \Carbon\Carbon::parse($record->session_end_time)->format('H:i');
-                    }),
-                TextEntry::make('session_description')->label('Rekap/Hasil Sesi')->columnSpanFull(),
-            ]);
     }
 
     /**
-     * Ambil data event dari database untuk kalender (Kode ini sudah benar)
+     * Action untuk melihat detail sesi
+     */
+    protected function viewAction(): Action
+    {
+        return Action::make('view')
+            ->label('Detail Sesi')
+            ->modalHeading('Detail Sesi Konseling')
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Tutup')
+            ->infolist(fn (Infolist $infolist) => $infolist
+                ->record($this->record)
+                ->schema([
+                    TextEntry::make('client.client_code')
+                        ->label('Kode Klien'),
+                    
+                    TextEntry::make('client.name')
+                        ->label('Nama Klien'),
+                    
+                    TextEntry::make('user.name')
+                        ->label('Psikolog'),
+                    
+                    TextEntry::make('session_date')
+                        ->label('Tanggal Sesi')
+                        ->date('d F Y'),
+                    
+                    TextEntry::make('session_start_time')
+                        ->label('Waktu Sesi')
+                        ->formatStateUsing(function ($state, $record) {
+                            if (!$record) return '-';
+                            return \Carbon\Carbon::parse($record->session_start_time)->format('H:i')
+                                . ' - ' .
+                                \Carbon\Carbon::parse($record->session_end_time)->format('H:i');
+                        }),
+                    
+                    TextEntry::make('session_description')
+                        ->label('Rekap/Hasil Sesi')
+                        ->columnSpanFull()
+                        ->default('-')
+                        ->html(),
+                ])
+            );
+    }
+
+    /**
+     * Ambil data event dari database untuk kalender
      */
     public function fetchEvents(array $fetchInfo): array
     {
@@ -89,9 +113,15 @@ class SessionCalendarWidget extends FullCalendarWidget
         }
 
         return $query->get()->map(function (ClientSession $session) {
+            $startTime = \Carbon\Carbon::parse($session->session_start_time)->format('H:i');
+            $endTime = \Carbon\Carbon::parse($session->session_end_time)->format('H:i');
+            
+            $clientName = $session->client?->name ?? 'Klien (Dihapus)';
+            $clientCode = $session->client?->client_code ?? '-';
+            
             return [
                 'id' => $session->id,
-                'title' => $session->client?->name ?? 'Klien (Dihapus)',
+                'title' => "$startTime - $endTime [$clientCode] $clientName",
                 'start' => "{$session->session_date} {$session->session_start_time}",
                 'end' => "{$session->session_date} {$session->session_end_time}",
             ];
@@ -102,6 +132,6 @@ class SessionCalendarWidget extends FullCalendarWidget
     {
         return false;
     }
-
+    
     protected static ?int $sort = 3;
 }

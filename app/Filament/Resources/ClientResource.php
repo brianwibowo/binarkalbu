@@ -8,17 +8,20 @@ use App\Models\Client;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Group;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Actions\Action; // ✅ Tambahkan ini
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
 use pxlrbt\FilamentExcel\Exports\ExcelExport;
-use Filament\Forms\Components\Group; // <-- PASTIKAN USE STATEMENT INI ADA
+use Maatwebsite\Excel\Facades\Excel; // ✅ Tambahkan ini
+use App\Filament\Exports\ClientWithSessionsExport; // ✅ Tambahkan ini (pastikan file-nya ada di App/Exports)
 
 class ClientResource extends Resource
 {
@@ -28,13 +31,10 @@ class ClientResource extends Resource
 
     public static function form(Form $form): Form
     {
-        // Cek apakah user yang sedang login adalah Admin.
         $isAdmin = Auth::user()->role === 'admin';
 
         return $form
             ->schema([
-                // BUNGKUS SEMUA FIELD DALAM SEBUAH GROUP
-                // GROUP INI AKAN DISEMBUNYIKAN JIKA USER BUKAN ADMIN
                 Group::make()
                     ->schema([
                         TextInput::make('client_code')
@@ -44,62 +44,75 @@ class ClientResource extends Resource
                         TextInput::make('name')
                             ->required()
                             ->maxLength(255),
-                        DatePicker::make('date_of_birth'),
+                        DatePicker::make('date_of_birth')
+                            ->label('Tanggal Lahir'),
                         TextInput::make('whatsapp_number')
+                            ->label('Nomor WhatsApp')
                             ->tel()
                             ->maxLength(20),
                         Textarea::make('address')
+                            ->label('Alamat')
                             ->columnSpanFull(),
                         Textarea::make('initial_diagnosis')
+                            ->label('Diagnosis Awal')
                             ->columnSpanFull(),
                     ])
-                    ->hidden(! $isAdmin) // <-- LOGIKA KUNCI: SEMBUNYIKAN DARI PSIKOLOG
+                    ->hidden(!$isAdmin),
             ]);
     }
 
     public static function table(Table $table): Table
     {
-        // Cek apakah user adalah psikolog
         $isPsikolog = Auth::user()->role === 'psikolog';
 
         return $table
             ->columns([
                 TextColumn::make('client_code')
-                ->label('Kode Klien')
-                ->searchable()
-                ->sortable(),
+                    ->label('Kode Klien')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('name')
+                    ->label('Nama')
                     ->searchable(),
                 TextColumn::make('date_of_birth')
+                    ->label('Tanggal Lahir')
                     ->date()
                     ->sortable(),
                 TextColumn::make('whatsapp_number')
+                    ->label('Nomor WhatsApp')
                     ->searchable()
-                    ->hidden($isPsikolog), // Kolom ini tetap disembunyikan dari tabel
+                    ->hidden($isPsikolog),
                 TextColumn::make('created_at')
+                    ->label('Dibuat Pada')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->filters([
-                // ...
-            ])
+            ->filters([])
             ->headerActions([
-                Tables\Actions\CreateAction::make()->hidden($isPsikolog), // Tombol Buat Klien Baru disembunyikan
-                ExportAction::make('exportExcel')
-                    ->exports([
-                        ExcelExport::make('all_data')
-                            ->fromTable()
-                            ->withFilename('Data Klien -' . now()->format('Y-m-d_H-i-s'))
-                    ]),
+                Tables\Actions\CreateAction::make()
+                    ->hidden($isPsikolog),
+
+                Action::make('exportExcel')
+                    ->label('Export ke Excel')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('success')
+                    ->action(function () {
+                        $fileName = 'Data Klien & Sesi - ' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+
+                        return Excel::download(
+                            new ClientWithSessionsExport(),
+                            $fileName
+                        );
+                    }),
             ])
             ->actions([
-                // Tombol Edit di baris ini SEKARANG TERLIHAT oleh semua role
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()->hidden($isPsikolog),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->hidden($isPsikolog),
                 ]),
             ]);
     }

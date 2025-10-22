@@ -96,43 +96,66 @@ class DailyRecapResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
-            ->columns([
-                TextColumn::make('recap_date')
-                    ->label('Tanggal Rekap')
-                    ->date()
-                    ->sortable(),
-                TextColumn::make('session_count')
-                    ->label('Jumlah Sesi')
-                    ->sortable(),
-                TextColumn::make('new_chats')
-                    ->label('Chat Baru'),
-                TextColumn::make('created_at')
-                    ->label('Dibuat Pada')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-            ])
-            ->filters([])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+    return $table
+        ->columns([
+            TextColumn::make('recap_date')
+                ->label('Tanggal Rekap')
+                ->date()
+                ->sortable(),
+
+            TextColumn::make('session_count')
+                ->label('Jumlah Sesi Praktek')
+                ->sortable(),
+
+            TextColumn::make('new_chats')
+                ->label('Chat Masuk Baru'),
+
+            TextColumn::make('new_client_goals')
+                ->label('Goals Klien Baru'),
+
+            TextColumn::make('gmap_reviews')
+                ->label('Ulasan Google Map'),
+
+            TextColumn::make('source_tiktok')
+                ->label('Dari TikTok'),
+
+            TextColumn::make('source_google')
+                ->label('Dari Google'),
+
+            TextColumn::make('source_instagram')
+                ->label('Dari Instagram'),
+
+            TextColumn::make('source_friend')
+                ->label('Dari Teman/Kerabat'),
+
+            TextColumn::make('jam_gandeng')
+                ->label('Jam Gandeng'),
+
+            TextColumn::make('created_at')
+                ->label('Dibuat Pada')
+                ->dateTime()
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
+        ])
+        ->filters([])
+        ->actions([
+            Tables\Actions\EditAction::make(),
+        ])
+        ->bulkActions([
+            Tables\Actions\BulkActionGroup::make([
+                Tables\Actions\DeleteBulkAction::make(),
+            ]),
+        ])
+        ->headerActions([
+            ExportAction::make('exportExcel')
+                ->label('Export Excel')
+                ->exports([
+                    ExcelExport::make('form')
+                        ->fromForm()
+                        ->withFilename('Rekap Harian -' . now()->format('Y-m-d_H-i-s')),
                 ]),
-            ])
-            ->headerActions([
-                Tables\Actions\CreateAction::make(),
-                ExportAction::make('exportExcel')
-                    ->label('Export Excel')
-                    ->exports([
-                        ExcelExport::make('form')
-                            ->fromForm()
-                            ->withFilename('Rekap Harian -' . now()->format('Y-m-d_H-i-s')),
-                    ]),
-            ])
-            ->defaultSort('recap_date', 'desc');
+        ])
+        ->defaultSort('recap_date', 'desc');
     }
 
     public static function getRelations(): array
