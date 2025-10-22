@@ -37,6 +37,10 @@ class ClientResource extends Resource
                 // GROUP INI AKAN DISEMBUNYIKAN JIKA USER BUKAN ADMIN
                 Group::make()
                     ->schema([
+                        TextInput::make('client_code')
+                            ->label('Kode Klien')
+                            ->disabled()
+                            ->dehydrated(),
                         TextInput::make('name')
                             ->required()
                             ->maxLength(255),
@@ -60,6 +64,10 @@ class ClientResource extends Resource
 
         return $table
             ->columns([
+                TextColumn::make('client_code')
+                ->label('Kode Klien')
+                ->searchable()
+                ->sortable(),
                 TextColumn::make('name')
                     ->searchable(),
                 TextColumn::make('date_of_birth')
