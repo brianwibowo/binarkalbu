@@ -15,13 +15,13 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Tables\Actions\Action; // ✅ Tambahkan ini
+use Filament\Tables\Actions\Action; 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
 use pxlrbt\FilamentExcel\Exports\ExcelExport;
-use Maatwebsite\Excel\Facades\Excel; // ✅ Tambahkan ini
-use App\Filament\Exports\ClientWithSessionsExport; // ✅ Tambahkan ini (pastikan file-nya ada di App/Exports)
+use Maatwebsite\Excel\Facades\Excel; 
+use App\Filament\Exports\ClientWithSessionsExport; 
 
 class ClientResource extends Resource
 {
@@ -31,34 +31,43 @@ class ClientResource extends Resource
 
     public static function form(Form $form): Form
     {
-        $isAdmin = Auth::user()->role === 'admin';
+    $isAdmin = Auth::user()->role === 'admin';
 
-        return $form
-            ->schema([
-                Group::make()
-                    ->schema([
-                        TextInput::make('client_code')
-                            ->label('Kode Klien')
-                            ->disabled()
-                            ->dehydrated(),
-                        TextInput::make('name')
-                            ->required()
-                            ->maxLength(255),
-                        DatePicker::make('date_of_birth')
-                            ->label('Tanggal Lahir'),
-                        TextInput::make('whatsapp_number')
-                            ->label('Nomor WhatsApp')
-                            ->tel()
-                            ->maxLength(20),
-                        Textarea::make('address')
-                            ->label('Alamat')
-                            ->columnSpanFull(),
-                        Textarea::make('initial_diagnosis')
-                            ->label('Diagnosis Awal')
-                            ->columnSpanFull(),
-                    ])
-                    ->hidden(!$isAdmin),
-            ]);
+    return $form
+        ->schema([
+            Group::make()
+                ->schema([
+                    TextInput::make('client_code')
+                        ->label('Kode Klien')
+                        ->required() 
+                        ->unique(ignoreRecord: true) 
+                        ->maxLength(20)
+                        ->placeholder('Contoh: KL001, BT7HMS, dll')
+                        ->helperText('Masukkan kode unik untuk klien ini'),
+                    
+                    TextInput::make('name')
+                        ->label('Nama Klien')
+                        ->required()
+                        ->maxLength(255),
+                    
+                    DatePicker::make('date_of_birth')
+                        ->label('Tanggal Lahir'),
+                    
+                    TextInput::make('whatsapp_number')
+                        ->label('Nomor WhatsApp')
+                        ->tel()
+                        ->maxLength(20),
+                    
+                    Textarea::make('address')
+                        ->label('Alamat')
+                        ->columnSpanFull(),
+                    
+                    Textarea::make('initial_diagnosis')
+                        ->label('Diagnosis Awal')
+                        ->columnSpanFull(),
+                ])
+                ->hidden(! $isAdmin)
+        ]);
     }
 
     public static function table(Table $table): Table

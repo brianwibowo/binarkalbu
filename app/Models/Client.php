@@ -4,18 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Client extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array
-     */
     protected $fillable = [
         'client_code',
         'name',
@@ -24,20 +18,9 @@ class Client extends Model
         'address',
         'initial_diagnosis',
     ];
-    protected static function boot()
-    {
-        parent::boot();
 
-        static::creating(function ($client) {
-            do {
-                $code = Str::upper(Str::random(6));
-            } while (self::where('client_code', $code)->exists()); 
-
-            $client->client_code = $code;
-        });
-    }
-    public function sessions()
+    public function sessions(): HasMany
     {
-    return $this->hasMany(ClientSession::class);
+        return $this->hasMany(ClientSession::class);
     }
 }
