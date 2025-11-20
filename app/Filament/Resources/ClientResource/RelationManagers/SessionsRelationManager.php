@@ -41,18 +41,15 @@ class SessionsRelationManager extends RelationManager
                     ->dehydrated(),
                 DatePicker::make('session_date')
                     ->label('Tanggal Sesi')
-                    ->required()
                     ->hidden(! $isAdmin)
                     ->dehydrated(),
                 TimePicker::make('session_start_time')
                     ->label('Jam Mulai')
-                    ->required()
                     ->seconds(false)
                     ->hidden(! $isAdmin)
                     ->dehydrated(),
                 TimePicker::make('session_end_time')
                     ->label('Jam Selesai')
-                    ->required()
                     ->seconds(false)
                     ->hidden(! $isAdmin)
                     ->dehydrated(),
