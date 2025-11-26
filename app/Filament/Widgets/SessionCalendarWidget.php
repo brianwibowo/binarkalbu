@@ -83,10 +83,13 @@ class SessionCalendarWidget extends FullCalendarWidget
                     TextEntry::make('session_start_time')
                         ->label('Waktu Sesi')
                         ->formatStateUsing(function ($state, $record) {
-                            if (!$record) return '-';
-                            return \Carbon\Carbon::parse($record->session_start_time)->format('H:i')
-                                . ' - ' .
-                                \Carbon\Carbon::parse($record->session_end_time)->format('H:i');
+                            if (!$record || !$record->session_start_time || !$record->session_end_time) {
+                                return '-';
+                            }
+                            // Format TIME type (HH:MM:SS) ke display format (HH:MM)
+                            $start = substr($record->session_start_time, 0, 5);
+                            $end = substr($record->session_end_time, 0, 5);
+                            return "$start - $end";
                         }),
                     
                     TextEntry::make('session_description')
@@ -106,20 +109,18 @@ class SessionCalendarWidget extends FullCalendarWidget
         $user = Auth::user();
         $query = ClientSession::query()
             ->with(['client', 'user'])
-            ->whereBetween('session_date', [$fetchInfo['start'], $fetchInfo['end']]);
+            ->whereBetween('session_date', [$fetchInfo['start'], $fetchInfo['end']])
+            ->whereNotNull('session_start_time')
+            ->whereNotNull('session_end_time');
 
         if ($user?->role === 'psikolog') {
             $query->where('user_id', $user->id);
         }
 
         return $query->get()->map(function (ClientSession $session) {
-            // Handle time fields properly - they're stored as TIME type (H:i:s)
-            $startTime = $session->session_start_time ?? '00:00';
-            $endTime = $session->session_end_time ?? '00:00';
-            
-            // Ensure format is H:i (remove seconds if present)
-            $startTime = substr($startTime, 0, 5);
-            $endTime = substr($endTime, 0, 5);
+            // Format TIME type (HH:MM:SS) langsung tanpa Carbon parse
+            $startTime = substr($session->session_start_time, 0, 5); // Ambil HH:MM
+            $endTime = substr($session->session_end_time, 0, 5); // Ambil HH:MM
             
             $clientName = $session->client?->name ?? 'Klien (Dihapus)';
             $clientCode = $session->client?->client_code ?? '-';
@@ -127,8 +128,8 @@ class SessionCalendarWidget extends FullCalendarWidget
             return [
                 'id' => $session->id,
                 'title' => "$startTime - $endTime [$clientCode] $clientName",
-                'start' => "{$session->session_date}T{$session->session_start_time}",
-                'end' => "{$session->session_date}T{$session->session_end_time}",
+                'start' => "{$session->session_date} {$session->session_start_time}",
+                'end' => "{$session->session_date} {$session->session_end_time}",
             ];
         })->all();
     }
