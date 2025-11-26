@@ -45,14 +45,11 @@ class SessionCalendarWidget extends FullCalendarWidget
                 TextEntry::make('session_date')->label('Tanggal Sesi')
                     ->date('d F Y'),
                 TextEntry::make('session_start_time')->label('Waktu')
-                    ->state(function ($record) {
-                        if (!$record) return '-';
-                        $startTime = $record->session_start_time ?? '00:00';
-                        $endTime = $record->session_end_time ?? '00:00';
-                        // Ensure format is H:i (remove seconds if present)
-                        $startTime = substr($startTime, 0, 5);
-                        $endTime = substr($endTime, 0, 5);
-                        return "$startTime - $endTime";
+                    ->formatStateUsing(function ($state, $record) {
+                        if (!$record || !$state) return '';
+                        return \Carbon\Carbon::parse($record->session_start_time)->format('H:i')
+                            . ' - ' .
+                            \Carbon\Carbon::parse($record->session_end_time)->format('H:i');
                     }),
                 TextEntry::make('session_description')->label('Rekap/Hasil Sesi')->columnSpanFull(),
             ]);
@@ -75,22 +72,11 @@ class SessionCalendarWidget extends FullCalendarWidget
         }
 
         return $query->get()->map(function (ClientSession $session) {
-            // Handle time fields properly - they're stored as TIME type (H:i:s)
-            $startTime = $session->session_start_time ?? '00:00';
-            $endTime = $session->session_end_time ?? '00:00';
-            
-            // Ensure format is H:i (remove seconds if present)
-            $startTime = substr($startTime, 0, 5);
-            $endTime = substr($endTime, 0, 5);
-            
-            $clientName = $session->client?->name ?? 'Klien (Dihapus)';
-            $userName = $session->user?->name ?? 'Psikolog (Dihapus)';
-            
             return [
                 'id' => $session->id,
-                'title' => "$startTime - $endTime $clientName ($userName)",
-                'start' => "{$session->session_date}T{$session->session_start_time}",
-                'end' => "{$session->session_date}T{$session->session_end_time}",
+                'title' => "{$session->client?->name} ({$session->user?->name})",
+                'start' => "{$session->session_date} {$session->session_start_time}",
+                'end' => "{$session->session_date} {$session->session_end_time}",
             ];
         })->all();
     }

@@ -1,14 +1,15 @@
 <?php
+
 namespace App\Filament\Widgets;
 
 use App\Models\ClientSession;
-use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Saade\FilamentFullCalendar\Widgets\FullCalendarWidget;
+use Carbon\Carbon;
 
 class SessionCalendarWidget extends FullCalendarWidget
 {
@@ -16,47 +17,38 @@ class SessionCalendarWidget extends FullCalendarWidget
     
     public Model|int|string|null $record = null;
 
-    /**
-     * Konfigurasi FullCalendar
-     */
     public function config(): array
     {
         return [
-            'displayEventTime' => false, // Sembunyikan waktu otomatis
-            'locale' => 'id', // Set locale Indonesia
+            'locale' => 'id',
+            'timeZone' => 'Asia/Jakarta',
+            'nowIndicator' => true,
+            'headerToolbar' => [
+                'left' => 'prev,next today',
+                'center' => 'title',
+                'right' => 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+            ],
         ];
     }
 
-    /**
-     * Menonaktifkan tombol "New event" di header kalender
-     */
     protected function headerActions(): array
     {
         return [];
     }
 
-    /**
-     * Event listener saat jadwal diklik
-     */
     public function onEventClick(array $event): void
     {
         $this->record = ClientSession::with(['client', 'user'])->find($event['id']);
-        $this->mountAction('view');
+        if ($this->record) {
+            $this->mountAction('view');
+        }
     }
 
-    /**
-     * Definisikan actions yang tersedia
-     */
     protected function modalActions(): array
     {
-        return [
-            $this->viewAction(),
-        ];
+        return [$this->viewAction()];
     }
 
-    /**
-     * Action untuk melihat detail sesi
-     */
     protected function viewAction(): Action
     {
         return Action::make('view')
@@ -67,31 +59,22 @@ class SessionCalendarWidget extends FullCalendarWidget
             ->infolist(fn (Infolist $infolist) => $infolist
                 ->record($this->record)
                 ->schema([
-                    TextEntry::make('client.client_code')
-                        ->label('Kode Klien'),
-                    
-                    TextEntry::make('client.name')
-                        ->label('Nama Klien'),
-                    
-                    TextEntry::make('user.name')
-                        ->label('Psikolog'),
-                    
-                    TextEntry::make('session_date')
-                        ->label('Tanggal Sesi')
-                        ->date('d F Y'),
-                    
+                    TextEntry::make('client.client_code')->label('Kode Klien'),
+                    TextEntry::make('client.name')->label('Nama Klien'),
+                    TextEntry::make('user.name')->label('Psikolog'),
+                    TextEntry::make('session_date')->label('Tanggal Sesi')->date('d F Y'),
                     TextEntry::make('session_start_time')
                         ->label('Waktu Sesi')
                         ->formatStateUsing(function ($state, $record) {
-                            if (!$record || !$record->session_start_time || !$record->session_end_time) {
-                                return '-';
+                            if (!$record || !$record->session_start_time || !$record->session_end_time) return '-';
+                            try {
+                                $start = Carbon::parse($record->session_start_time)->format('H:i');
+                                $end = Carbon::parse($record->session_end_time)->format('H:i');
+                                return "$start - $end";
+                            } catch (\Exception $e) {
+                                return "$record->session_start_time - $record->session_end_time";
                             }
-                            // Format TIME type (HH:MM:SS) ke display format (HH:MM)
-                            $start = substr($record->session_start_time, 0, 5);
-                            $end = substr($record->session_end_time, 0, 5);
-                            return "$start - $end";
                         }),
-                    
                     TextEntry::make('session_description')
                         ->label('Rekap/Hasil Sesi')
                         ->columnSpanFull()
@@ -101,37 +84,66 @@ class SessionCalendarWidget extends FullCalendarWidget
             );
     }
 
-    /**
-     * Ambil data event dari database untuk kalender
-     */
     public function fetchEvents(array $fetchInfo): array
     {
         $user = Auth::user();
+        
+        $startDate = Carbon::parse($fetchInfo['start'])->startOfDay();
+        $endDate = Carbon::parse($fetchInfo['end'])->endOfDay();
+        
         $query = ClientSession::query()
             ->with(['client', 'user'])
-            ->whereBetween('session_date', [$fetchInfo['start'], $fetchInfo['end']])
+            ->whereNotNull('session_date')
             ->whereNotNull('session_start_time')
-            ->whereNotNull('session_end_time');
+            ->whereNotNull('session_end_time')
+            ->whereBetween('session_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
 
-        if ($user?->role === 'psikolog') {
+        if ($user && $user->role === 'psikolog') {
             $query->where('user_id', $user->id);
         }
 
-        return $query->get()->map(function (ClientSession $session) {
-            // Format TIME type (HH:MM:SS) langsung tanpa Carbon parse
-            $startTime = substr($session->session_start_time, 0, 5); // Ambil HH:MM
-            $endTime = substr($session->session_end_time, 0, 5); // Ambil HH:MM
-            
-            $clientName = $session->client?->name ?? 'Klien (Dihapus)';
-            $clientCode = $session->client?->client_code ?? '-';
-            
-            return [
-                'id' => $session->id,
-                'title' => "$startTime - $endTime [$clientCode] $clientName",
-                'start' => "{$session->session_date} {$session->session_start_time}",
-                'end' => "{$session->session_date} {$session->session_end_time}",
-            ];
-        })->all();
+        return $query->get()
+            ->map(function (ClientSession $session) {
+                try {
+                    // Ambil Tanggal saja (Format Y-m-d)
+                    $dateOnly = $session->session_date instanceof \Carbon\Carbon 
+                        ? $session->session_date->format('Y-m-d') 
+                        : substr((string)$session->session_date, 0, 10);
+
+                    // Gabungkan Tanggal + Jam
+                    $startDateTime = Carbon::parse("$dateOnly {$session->session_start_time}");
+                    $endDateTime = Carbon::parse("$dateOnly {$session->session_end_time}");
+                    
+                    // Format ISO String untuk FullCalendar
+                    $startIso = $startDateTime->toDateTimeString();
+                    $endIso = $endDateTime->toDateTimeString();
+
+                } catch (\Exception $e) {
+                    $startIso = $session->session_date; 
+                    $endIso = $session->session_date;
+                }
+
+                $clientName = $session->client?->name ?? 'Klien (Dihapus)';
+                $clientCode = $session->client?->client_code ?? '-';
+                
+                $color = match ($session->session_status) {
+                    'terpakai' => '#10b981', // Hijau
+                    'belum_terpakai' => '#f59e0b', // Kuning/Oranye
+                    default => '#3b82f6', // Biru
+                };
+
+                return [
+                    'id' => $session->id,
+                    // PERUBAHAN DISINI: Hapus variabel jam ($startTimeFmt) dari title
+                    'title' => "[$clientCode] $clientName", 
+                    'start' => $startIso,
+                    'end' => $endIso,
+                    'backgroundColor' => $color,
+                    'borderColor' => $color,
+                ];
+            })
+            ->values()
+            ->toArray();
     }
     
     public static function canCreate(): bool
