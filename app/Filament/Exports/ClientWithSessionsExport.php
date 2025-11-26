@@ -107,7 +107,7 @@ class ClientWithSessionsExport implements FromCollection, WithHeadings, WithMapp
             $session ? \Carbon\Carbon::parse($session->session_start_time)->format('H:i') : '',
             $session ? \Carbon\Carbon::parse($session->session_end_time)->format('H:i') : '',
             $session ? ($session->session_status === 'terpakai' ? 'Terpakai' : 'Belum Terpakai') : '',
-            $session ? $session->user->name : '',
+            $session ? ($session->user?->name ?? '-') : '', // Fix: Handle null user
             $session ? $session->session_description : '',
         ];
 
@@ -115,7 +115,7 @@ class ClientWithSessionsExport implements FromCollection, WithHeadings, WithMapp
         if ($this->isAdmin) {
             $mapped[] = $session && $session->transfer_date ? \Carbon\Carbon::parse($session->transfer_date)->format('d/m/Y') : '';
             $mapped[] = $session ? ($session->payment_status === 'lunas' ? 'Lunas' : 'DP') : '';
-            $mapped[] = $session ? 'Rp ' . number_format($session->payment_amount, 0, ',', '.') : '';
+            $mapped[] = $session ? 'Rp ' . number_format($session->payment_amount ?? 0, 0, ',', '.') : '';
         }
 
         return $mapped;
