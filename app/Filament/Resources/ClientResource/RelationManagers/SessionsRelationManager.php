@@ -126,6 +126,14 @@ class SessionsRelationManager extends RelationManager
             ->recordTitleAttribute('session_date')
             ->columns([
                 TextColumn::make('session_date')->label('Tanggal Sesi')->date()->sortable(),
+                TextColumn::make('session_start_time')
+                    ->label('Jam Mulai')
+                    ->time('H:i')
+                    ->sortable(),
+                TextColumn::make('session_end_time')
+                    ->label('Jam Selesai')
+                    ->time('H:i')
+                    ->sortable(),
                 TextColumn::make('session_status')
                     ->label('Status Sesi')
                     ->badge()
