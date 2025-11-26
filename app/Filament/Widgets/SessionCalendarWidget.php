@@ -113,8 +113,13 @@ class SessionCalendarWidget extends FullCalendarWidget
         }
 
         return $query->get()->map(function (ClientSession $session) {
-            $startTime = \Carbon\Carbon::parse($session->session_start_time)->format('H:i');
-            $endTime = \Carbon\Carbon::parse($session->session_end_time)->format('H:i');
+            // Handle time fields properly - they're stored as TIME type (H:i:s)
+            $startTime = $session->session_start_time ?? '00:00';
+            $endTime = $session->session_end_time ?? '00:00';
+            
+            // Ensure format is H:i (remove seconds if present)
+            $startTime = substr($startTime, 0, 5);
+            $endTime = substr($endTime, 0, 5);
             
             $clientName = $session->client?->name ?? 'Klien (Dihapus)';
             $clientCode = $session->client?->client_code ?? '-';
@@ -122,8 +127,8 @@ class SessionCalendarWidget extends FullCalendarWidget
             return [
                 'id' => $session->id,
                 'title' => "$startTime - $endTime [$clientCode] $clientName",
-                'start' => "{$session->session_date} {$session->session_start_time}",
-                'end' => "{$session->session_date} {$session->session_end_time}",
+                'start' => "{$session->session_date}T{$session->session_start_time}",
+                'end' => "{$session->session_date}T{$session->session_end_time}",
             ];
         })->all();
     }
